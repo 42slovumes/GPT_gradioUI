@@ -9,13 +9,16 @@ def is_imag(filename):
 def upload_file(files,apikey):
     print(files.name)
     user_text=''
+    text = ''
     is_pdf = is_imag(files.name)
     if(is_pdf):
         print(files.name)
         pdf = pdfplumber.open(str(files.name))   # 開啟 pdf
-        page = pdf.pages[0]  # 获取第一页
-        text = page.extract_text()  # 提取文本   # 取出文字
+        for page in pdf.pages: # 获取每一页
+            text += page.extract_text()# 提取文本   # 取出文字
+                           
         print(text)
+        user_text="以上內容請幫我統整，摘要出內容大綱"
         return chat_with_gpt_filepdf(text,apikey,user_text)        # [<Page:1>, <Page:2>, <Page:3>]，共有三頁
     else:
         return "請傳送PDF檔"
@@ -74,12 +77,19 @@ def output_ans(input,apikey,programming_language,key):
         input_messages="以 "+programming_language+" 語法，撰寫一段程式，並以中文舉例說明為什麼這樣寫，並且請將程式碼區塊用三個反引號框起來。  ： "
     elif(key =="分析，解讀程式碼"):
          input_messages="指令：解讀下方 "+programming_language+" 程式碼，以中文註解告訴我這個程式碼要達成什麼目的。並且請將程式碼區塊用三個反引號框起來。\n"
-    elif(key =="自動產生程式碼"):
-         input_messages="以 "+programming_language+" 語法，撰寫一段程式，並以中文舉例說明為什麼這樣寫，並且請將程式碼區塊用三個反引號框起來。  ： "
+    elif(key =="程式碼Debug"):
+         input_messages="分析下方 "+programming_language+" 程式碼，針對邏輯和文法上偵錯，並提出正確改寫方式。並且請將程式碼區塊用三個反引號框起來。 "
     else:
         input_messages =""
     return chat_with_gpt(input,apikey,input_messages)
-with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {margin-top : 10px ; width : 100% ; height : 67px } #margin_tab {margin-top : 10px ;} #margin_markdown {margin-top : -22px ;}") as demo:
+def output_ans_2(input,apikey,programming_language,key,count):
+    input_messages =""
+    print(key)
+    input_messages="請幫下方 "+programming_language+" 程式碼，設計 "+count+" 個測試案例，並確定這些測試案例皆可正確使用。每一個個案的輸出格式要提到:測試案例 輸入 預期輸出 。並且請將程式碼區塊用三個反引號框起來。"
+    
+    return chat_with_gpt(input,apikey,input_messages)
+with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {margin-top : 10px ; width : 100% ; height : 67px } #testpls3 { height : 94px ; } #margin_tab {margin-top : 10px ;} #margin_markdown {margin-top : -22px ;}") as demo:
+ gr.HighlightedText(value="GTPmate",label="",interactive=False)
  with gr.Tab("改寫程式碼"):
     with gr.Row():
         with gr.Column(scale=6):
@@ -203,60 +213,67 @@ with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {marg
  btn2.click(clear_code,outputs=[text2])
  btn1.click(output_ans, inputs=[text2,text1,dropdown1,key], outputs=[text_output])
  # 程式碼 Debug
- with gr.Tab("程式碼 Debug"):               
+ with gr.Tab("程式碼Debug"):               
     with gr.Row():
         with gr.Column(scale=6):
-            text1 = gr.Textbox(label="",value="",placeholder="api key")
-            text2 = gr.Textbox(label="",value="",placeholder="程式碼")
+            apikey_text = gr.Textbox(label="",value="",placeholder="api key")
+            code_text = gr.Textbox(label="",value="",placeholder="程式碼")
             
         with gr.Column(): 
             with gr.Box():
-                btn2 = gr.Button(elem_id="testpls",value="Clear Code")
-                btn1 = gr.Button(elem_id="testpls2",value="START")
+                clearbtn = gr.Button(elem_id="testpls",value="Clear Code")
+                startbtn = gr.Button(elem_id="testpls2",value="START")
     with gr.Row():
         with gr.Column(scale=1):   
               with gr.Box():
                 with gr.Column():
-                    key =gr.HighlightedText(value="程式碼 Debug",label="",interactive=False)
+                    tab_index =gr.HighlightedText(value="程式碼Debug",label="",interactive=False)
                 with gr.Box(): 
                     text_input1 = gr.Markdown(value="這個指令可以幫你檢查現有程式碼是否有執行上的 bug 或一些潛在問題。",label="")
                     text_input2 = gr.Markdown(value="指令功能：檢查現有程式碼，排除問題程式碼。",label="")
                     text_input3 = gr.Markdown(value="分析下方 <{程式語言}> 程式碼，針對邏輯和文法上偵錯，並提出正確改寫方式。",label="")
                     text_input4= gr.Markdown(value="<{程式碼}>",label="")
+                    language=gr.Dropdown( ["python", "java", "javascipt","html","rust", "Go", "Perl", "PHP", "Ruby", "Swift"], label="請選擇一個程式語言" ,elem_id="margin_tab")
               with gr.Box():
                 with gr.Column():
                     text_output = gr.Markdown(lines=5,label="output")
- btn2.click(clear_code,outputs=[text2])
- btn1.click(output_ans, inputs=[text2,text1,dropdown1,key], outputs=[text_output])
+ clearbtn.click(clear_code,outputs=[code_text])
+ startbtn.click(output_ans, inputs=[code_text,apikey_text,language,tab_index], outputs=[text_output])
  
 # 撰寫程式碼測試案例
 
  with gr.Tab("撰寫程式碼測試案例"):               
-   with gr.Row():
+    with gr.Row():
         with gr.Column(scale=6):
-            text1 = gr.Textbox(label="",value="",placeholder="api key")
-            text2 = gr.Textbox(label="",value="",placeholder="程式碼")
+            apikey_text = gr.Textbox(label="",value="",placeholder="api key")
+            code_text = gr.Textbox(label="",value="",placeholder="程式碼")
             
         with gr.Column(): 
             with gr.Box():
-                btn2 = gr.Button(elem_id="testpls",value="Clear Code")
-                btn1 = gr.Button(elem_id="testpls2",value="START")
-   with gr.Row():
+                clearbtn = gr.Button(elem_id="testpls",value="Clear Code")
+                startbtn = gr.Button(elem_id="testpls2",value="START")
+    with gr.Row():
+        with gr.Column(scale=6):
+            language=gr.Dropdown( ["python", "java", "javascipt","html","rust", "Go", "Perl", "PHP", "Ruby", "Swift"], label="請選擇一個程式語言" )
+        with gr.Column():
+            count = gr.Textbox(elem_id="testpls3",label="",value="",placeholder="測試數量")
+    with gr.Row():
         with gr.Column(scale=1):   
               with gr.Box():
                 with gr.Column():
-                    key =gr.HighlightedText(value="程式碼 Debug",label="",interactive=False)
+                    tab_index =gr.HighlightedText(value="撰寫程式碼測試案例",label="",interactive=False)
                 with gr.Box(): 
                     text_input1 = gr.Markdown(value="這段指令可以幫你提供的程式碼撰寫測試案例，可以在指令中指定要產生的案例數。",label="")
                     text_input2 = gr.Markdown(value="指令功能：撰寫程式測試案例",label="")
-                    text_input3 = gr.Markdown(value="指令：請幫下方 <{程式語言}> 程式碼，設計 <{數量}> 個測試案例，並確定這些測試案例皆可正確使用。",label="")
+                    text_input3 = gr.Markdown(value="請幫下方 <{程式語言}> 程式碼，設計 <{數量}> 個測試案例，並確定這些測試案例皆可正確使用。",label="")
                     text_input4= gr.Markdown(value="<{程式碼}>",label="")
-        with gr.Box():
+                    
+              with gr.Box():
                 with gr.Column():
                     text_output = gr.Markdown(lines=5,label="output")
- btn2.click(clear_code,outputs=[text2])
- btn1.click(output_ans, inputs=[text2,text1,dropdown1,key], outputs=[text_output])
- with gr.Tab("chatpdf"):               
+ clearbtn.click(clear_code,outputs=[code_text])
+ startbtn.click(output_ans_2, inputs=[code_text,apikey_text,language,tab_index,count], outputs=[text_output])
+ with gr.Tab("PDF重點摘要"):               
     with gr.Row():
         with gr.Column(scale=6):
             text1 = gr.Textbox(label="",value="",placeholder="api key")
@@ -264,12 +281,11 @@ with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {marg
         with gr.Column(scale=1):   
               with gr.Box():
                 with gr.Column():
-                    key =gr.HighlightedText(value="程式碼 Debug",label="",interactive=False)
+                    key =gr.HighlightedText(value="PDF重點摘要",label="",interactive=False)
                 with gr.Box(): 
-                    text_input1 = gr.Markdown(value="這個指令可以幫你檢查現有程式碼是否有執行上的 bug 或一些潛在問題。",label="")
-                    text_input2 = gr.Markdown(value="指令功能：檢查現有程式碼，排除問題程式碼。",label="")
-                    text_input3 = gr.Markdown(value="分析下方 <{程式語言}> 程式碼，針對邏輯和文法上偵錯，並提出正確改寫方式。",label="")
-                    text_input4= gr.Markdown(value="<{程式碼}>",label="")
+                    text_input1 = gr.Markdown(value="這個指令可以幫你將上傳的PDF摘要其重點大綱。",label="")
+                    text_input2 = gr.Markdown(value="指令功能：以上內容請幫我統整，摘要出內容大綱。",label="")
+                 
               with gr.Box():
                 with gr.Column():
                         file_output = gr.File()
