@@ -3,6 +3,7 @@ import openai
 import pdfplumber
 #判斷檔案是否為圖片
 message_pdf =""
+messages_pdf = []
 def is_imag(filename):
     return filename[-4:] in ['.pdf']
 
@@ -18,7 +19,7 @@ def upload_file(files,apikey):
             text += page.extract_text()# 提取文本   # 取出文字
                            
         print(text)
-        user_text="以上內容請幫我統整，摘要出內容大綱"
+        user_text="上述文本請先幫我列出大綱"
         return chat_with_gpt_filepdf(text,apikey,user_text)        # [<Page:1>, <Page:2>, <Page:3>]，共有三頁
     else:
         return "請傳送PDF檔"
@@ -26,21 +27,22 @@ def chat_with_gpt_filepdf(input,apikey,input_messages):
     print(input)
     print(apikey)
     print(input_messages)
+    global messages_pdf
     openai.api_key = apikey
-    messages = []
-    messages.append({"role":"user","content":input+input_messages})   # 添加 user 回應
-    print(messages)
+   
+    messages_pdf.append({"role":"user","content":input+input_messages})   # 添加 user 回應
+    print(messages_pdf)
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        max_tokens=500,
+        max_tokens=1500,
         temperature=0.5,
-        messages=messages
+        messages=messages_pdf
     )
     ai_msg = response.choices[0].message.content.replace('\n','\n')
      # 將輸入的代碼轉換為Markdown格式的代碼塊
     markdown_code = f'{ai_msg}'
     # 將轉換後的Markdown格式代碼塊返回給Gradio Text框元件進行顯示
-    messages.append({"role":"assistant","content":ai_msg})   # 添加 ChatGPT 回應
+    messages_pdf.append({"role":"assistant","content":ai_msg})   # 添加 ChatGPT 回應
     print(markdown_code)
     return markdown_code 
     return 123
@@ -82,12 +84,15 @@ def output_ans(input,apikey,programming_language,key):
     else:
         input_messages =""
     return chat_with_gpt(input,apikey,input_messages)
-def output_ans_2(input,apikey,programming_language,key,count):
+def output_ans_testcode(input,apikey,programming_language,key,count):
     input_messages =""
     print(key)
     input_messages="請幫下方 "+programming_language+" 程式碼，設計 "+count+" 個測試案例，並確定這些測試案例皆可正確使用。每一個個案的輸出格式要提到:測試案例 輸入 預期輸出 。並且請將程式碼區塊用三個反引號框起來。"
     
     return chat_with_gpt(input,apikey,input_messages)
+def output_ans_pdf_qus(input,apikey):
+    input_messages =""
+    return chat_with_gpt_filepdf(input,apikey,input_messages)
 with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {margin-top : 10px ; width : 100% ; height : 67px } #testpls3 { height : 94px ; } #margin_tab {margin-top : 10px ;} #margin_markdown {margin-top : -22px ;}") as demo:
  gr.HighlightedText(value="GTPmate",label="",interactive=False)
  with gr.Tab("改寫程式碼"):
@@ -272,18 +277,20 @@ with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {marg
                 with gr.Column():
                     text_output = gr.Markdown(lines=5,label="output")
  clearbtn.click(clear_code,outputs=[code_text])
- startbtn.click(output_ans_2, inputs=[code_text,apikey_text,language,tab_index,count], outputs=[text_output])
+ startbtn.click(output_ans_testcode, inputs=[code_text,apikey_text,language,tab_index,count], outputs=[text_output])
  with gr.Tab("PDF重點摘要"):               
     with gr.Row():
         with gr.Column(scale=6):
             text1 = gr.Textbox(label="",value="",placeholder="api key")
+            text2 = gr.Textbox(label="",value="",placeholder="請先上傳PDF按下update按鈕後再發問(你要直接發問也是可以)")
+            qus_button = gr.Button(elem_id="",value="發問")
     with gr.Row():
         with gr.Column(scale=1):   
               with gr.Box():
                 with gr.Column():
                     key =gr.HighlightedText(value="PDF重點摘要",label="",interactive=False)
                 with gr.Box(): 
-                    text_input1 = gr.Markdown(value="這個指令可以幫你將上傳的PDF摘要其重點大綱。",label="")
+                    text_input1 = gr.Markdown(value="這個指令可以幫你將上傳的PDF摘要其重點大綱，後續使用者可以根據你上傳的PDF提出想問的問題。(注意，傳送的PDF不能是加密的，以及不能傳送只有圖片的PDF)",label="")
                     text_input2 = gr.Markdown(value="指令功能：以上內容請幫我統整，摘要出內容大綱。",label="")
                  
               with gr.Box():
@@ -292,4 +299,5 @@ with gr.Blocks(css="#testpls { width : 100% ; height : 67px ;  } #testpls2 {marg
                         file_button = gr.Button(elem_id="testpls2",value="update")
                         text_output = gr.Markdown(lines=5,label="output")
  file_button.click(upload_file,inputs=[file_output,text1], outputs=[text_output])
+ qus_button.click(output_ans_pdf_qus, inputs=[text2,text1], outputs=[text_output])
 demo.launch()   
